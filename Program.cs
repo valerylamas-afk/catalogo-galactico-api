@@ -242,5 +242,124 @@ app.MapPut("/cartas/{id:int}", (int id, CardPersonaje datos) =>
     return Results.Ok(cartaActualizada);
 });
 
+// ==========================================
+// EVENTOS
+// ==========================================
+
+// GET - Obtener todos los eventos
+app.MapGet("/eventos", () =>
+{
+    return Results.Ok(CatalogoStore.Eventos);
+});
+
+
+// GET - Obtener un evento por ID
+app.MapGet("/eventos/{id:int}", (int id) =>
+{
+    var evento = CatalogoStore.Eventos
+        .FirstOrDefault(e => e.Id == id);
+
+    if (evento is null)
+    {
+        return Results.NotFound("Evento no encontrado");
+    }
+
+    return Results.Ok(evento);
+});
+
+
+// POST - Crear un evento
+app.MapPost("/eventos", (Evento evento) =>
+{
+    if (string.IsNullOrWhiteSpace(evento.Nombre))
+    {
+        return Results.BadRequest("El nombre del evento es obligatorio");
+    }
+
+    if (evento.Participantes is null || evento.Participantes.Count == 0)
+    {
+        return Results.BadRequest(
+            "El evento debe tener al menos un participante"
+        );
+    }
+
+    foreach (int participanteId in evento.Participantes)
+    {
+        bool existePersonaje = CatalogoStore.Personajes
+            .Any(p => p.Id == participanteId);
+
+        if (!existePersonaje)
+        {
+            return Results.BadRequest(
+                $"El personaje con ID {participanteId} no existe"
+            );
+        }
+    }
+
+    int nuevoId = CatalogoStore.Eventos.Count == 0
+        ? 1
+        : CatalogoStore.Eventos.Max(e => e.Id) + 1;
+
+    var nuevoEvento = evento with
+    {
+        Id = nuevoId
+    };
+
+    CatalogoStore.Eventos.Add(nuevoEvento);
+
+    return Results.Created(
+        $"/eventos/{nuevoId}",
+        nuevoEvento
+    );
+});
+
+
+// PUT - Modificar un evento
+app.MapPut("/eventos/{id:int}", (int id, Evento datos) =>
+{
+    int posicion = CatalogoStore.Eventos
+        .FindIndex(e => e.Id == id);
+
+    if (posicion == -1)
+    {
+        return Results.NotFound("Evento no encontrado");
+    }
+
+    if (string.IsNullOrWhiteSpace(datos.Nombre))
+    {
+        return Results.BadRequest(
+            "El nombre del evento es obligatorio"
+        );
+    }
+
+    if (datos.Participantes is null || datos.Participantes.Count == 0)
+    {
+        return Results.BadRequest(
+            "El evento debe tener al menos un participante"
+        );
+    }
+
+    foreach (int participanteId in datos.Participantes)
+    {
+        bool existePersonaje = CatalogoStore.Personajes
+            .Any(p => p.Id == participanteId);
+
+        if (!existePersonaje)
+        {
+            return Results.BadRequest(
+                $"El personaje con ID {participanteId} no existe"
+            );
+        }
+    }
+
+    var eventoActualizado = datos with
+    {
+        Id = id
+    };
+
+    CatalogoStore.Eventos[posicion] = eventoActualizado;
+
+    return Results.Ok(eventoActualizado);
+});
 
 app.Run();
