@@ -7,7 +7,7 @@ public static class CatalogoStore
     public static List<Personaje> Personajes { get; } =
     [
         new(1, "Luke Skywalker", "Humano", "Rebelde", "Alianza Rebelde", "vivo", true),
-        new(2, "Darth Vader", "Humano", "Imperio", "Imperio Galáctico", "muerto", true),
+        new(2, "Darth Vader", "Humano", "Imperio", "Imperio Galáctico", "vivo", true),
         new(3, "Han Solo", "Humano", "Rebelde", "Alianza Rebelde", "vivo", false),
         new(4, "Chewbacca", "Wookiee", "Rebelde", "Alianza Rebelde", "vivo", false)
     ];

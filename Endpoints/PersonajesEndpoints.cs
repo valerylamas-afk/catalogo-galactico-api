@@ -224,6 +224,30 @@ public static class PersonajesEndpoints
                 );
             }
 
+            bool tieneCarta = CatalogoStore.Cartas
+                .Any(c => c.PersonajeId == id);
+
+            if (tieneCarta)
+            {
+                return Results.BadRequest(
+                    "No se puede eliminar el personaje porque tiene una carta asociada"
+                );
+            }
+
+            bool participaEnEvento = CatalogoStore.Eventos
+                .Any(e =>
+                    e.Participantes.Contains(id) ||
+                    e.Fallecidos.Contains(id) ||
+                    e.GanadorId == id
+                );
+
+            if (participaEnEvento)
+            {
+                return Results.BadRequest(
+                    "No se puede eliminar el personaje porque está relacionado con un evento"
+                );
+            }
+
             CatalogoStore.Personajes.Remove(personaje);
 
             return Results.NoContent();
@@ -231,11 +255,11 @@ public static class PersonajesEndpoints
         .WithTags("Personajes")
         .WithSummary("Eliminar personaje")
         .WithDescription(
-            "Elimina un personaje del catálogo."
+            "Elimina un personaje si no tiene cartas ni eventos asociados."
         )
         .Produces(StatusCodes.Status204NoContent)
+        .Produces<string>(StatusCodes.Status400BadRequest)
         .Produces<string>(StatusCodes.Status404NotFound);
-
 
         // GET - Eventos en los que participó un personaje
         app.MapGet("/personajes/{id:int}/eventos", (
