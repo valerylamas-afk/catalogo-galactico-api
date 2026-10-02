@@ -1,5 +1,6 @@
 using PersonajesApi.Data;
 using PersonajesApi.Models;
+using PersonajesApi.Models.DTOs;
 using PersonajesApi.Services;
 
 namespace PersonajesApi.Endpoints;
@@ -12,7 +13,14 @@ public static class EventosEndpoints
         app.MapGet("/eventos", () =>
         {
             return Results.Ok(CatalogoStore.Eventos);
-        });
+        })
+        .WithTags("Eventos")
+        .WithSummary("Listar eventos")
+        .WithDescription(
+            "Obtiene todos los eventos registrados en el catálogo."
+        )
+        .Produces<List<Evento>>(StatusCodes.Status200OK);
+
 
         // GET - Obtener un evento por ID
         app.MapGet("/eventos/{id:int}", (
@@ -23,14 +31,24 @@ public static class EventosEndpoints
 
             if (evento is null)
             {
-                return Results.NotFound("Evento no encontrado");
+                return Results.NotFound(
+                    "Evento no encontrado"
+                );
             }
 
             return Results.Ok(evento);
-        });
+        })
+        .WithTags("Eventos")
+        .WithSummary("Buscar evento por ID")
+        .WithDescription(
+            "Obtiene un evento utilizando su identificador."
+        )
+        .Produces<Evento>(StatusCodes.Status200OK)
+        .Produces<string>(StatusCodes.Status404NotFound);
+
 
         // POST - Crear un evento
-        app.MapPost("/eventos", (Evento evento) =>
+        app.MapPost("/eventos", (EventoDto evento) =>
         {
             if (string.IsNullOrWhiteSpace(evento.Nombre))
             {
@@ -47,10 +65,21 @@ public static class EventosEndpoints
                 );
             }
 
+            if (evento.Fallecidos is null)
+            {
+                return Results.BadRequest(
+                    "La lista de fallecidos es obligatoria"
+                );
+            }
+
+            // Verificar que todos los participantes existan
+            // y que no hayan muerto antes del evento.
             foreach (int participanteId in evento.Participantes)
             {
-                bool existePersonaje = CatalogoStore.Personajes
-                    .Any(p => p.Id == participanteId);
+                bool existePersonaje =
+                    CatalogoStore.Personajes.Any(p =>
+                        p.Id == participanteId
+                    );
 
                 if (!existePersonaje)
                 {
@@ -59,8 +88,8 @@ public static class EventosEndpoints
                     );
                 }
 
-                bool murioAnteriormente = CatalogoStore.Eventos
-                    .Any(e =>
+                bool murioAnteriormente =
+                    CatalogoStore.Eventos.Any(e =>
                         e.Fecha < evento.Fecha &&
                         e.Fallecidos.Contains(participanteId)
                     );
@@ -73,6 +102,7 @@ public static class EventosEndpoints
                 }
             }
 
+            // Verificar que cada fallecido sea participante.
             foreach (int fallecidoId in evento.Fallecidos)
             {
                 if (!evento.Participantes.Contains(fallecidoId))
@@ -81,49 +111,84 @@ public static class EventosEndpoints
                         $"El personaje fallecido con ID {fallecidoId} debe ser participante del evento"
                     );
                 }
+
+                // Si muere en este evento, no puede existir
+                // un evento posterior donde siga participando.
+                bool participaDespues =
+                    CatalogoStore.Eventos.Any(e =>
+                        e.Fecha > evento.Fecha &&
+                        e.Participantes.Contains(fallecidoId)
+                    );
+
+                if (participaDespues)
+                {
+                    return Results.BadRequest(
+                        $"El personaje con ID {fallecidoId} participa en un evento posterior y no puede morir en esta fecha"
+                    );
+                }
             }
 
             int nuevoId = CatalogoStore.Eventos.Count == 0
                 ? 1
                 : CatalogoStore.Eventos.Max(e => e.Id) + 1;
 
-            var nuevoEvento = evento with
-            {
-                Id = nuevoId
-            };
+            var nuevoEvento = new Evento(
+                nuevoId,
+                evento.Nombre,
+                evento.Fecha,
+                evento.Ubicacion,
+                evento.Descripcion,
+                evento.Participantes,
+                evento.Fallecidos,
+                evento.Resultado,
+                evento.GanadorId
+            );
 
             CatalogoStore.Eventos.Add(nuevoEvento);
 
+            // Actualizar estado de los fallecidos.
             foreach (int fallecidoId in evento.Fallecidos)
             {
                 int posicion = CatalogoStore.Personajes
                     .FindIndex(p => p.Id == fallecidoId);
 
-                var personaje = CatalogoStore.Personajes[posicion];
+                var personaje =
+                    CatalogoStore.Personajes[posicion];
 
-                CatalogoStore.Personajes[posicion] = personaje with
-                {
-                    Estado = "muerto"
-                };
+                CatalogoStore.Personajes[posicion] =
+                    personaje with
+                    {
+                        Estado = "muerto"
+                    };
             }
 
             return Results.Created(
                 $"/eventos/{nuevoId}",
                 nuevoEvento
             );
-        });
+        })
+        .WithTags("Eventos")
+        .WithSummary("Crear evento")
+        .WithDescription(
+            "Crea un evento y valida la consistencia temporal de sus participantes y fallecidos."
+        )
+        .Produces<Evento>(StatusCodes.Status201Created)
+        .Produces<string>(StatusCodes.Status400BadRequest);
+
 
         // PUT - Modificar un evento
         app.MapPut("/eventos/{id:int}", (
             int id,
-            Evento datos) =>
+            EventoDto datos) =>
         {
             int posicionEvento = CatalogoStore.Eventos
                 .FindIndex(e => e.Id == id);
 
             if (posicionEvento == -1)
             {
-                return Results.NotFound("Evento no encontrado");
+                return Results.NotFound(
+                    "Evento no encontrado"
+                );
             }
 
             if (string.IsNullOrWhiteSpace(datos.Nombre))
@@ -141,10 +206,19 @@ public static class EventosEndpoints
                 );
             }
 
+            if (datos.Fallecidos is null)
+            {
+                return Results.BadRequest(
+                    "La lista de fallecidos es obligatoria"
+                );
+            }
+
             foreach (int participanteId in datos.Participantes)
             {
-                bool existePersonaje = CatalogoStore.Personajes
-                    .Any(p => p.Id == participanteId);
+                bool existePersonaje =
+                    CatalogoStore.Personajes.Any(p =>
+                        p.Id == participanteId
+                    );
 
                 if (!existePersonaje)
                 {
@@ -153,8 +227,8 @@ public static class EventosEndpoints
                     );
                 }
 
-                bool murioAnteriormente = CatalogoStore.Eventos
-                    .Any(e =>
+                bool murioAnteriormente =
+                    CatalogoStore.Eventos.Any(e =>
                         e.Id != id &&
                         e.Fecha < datos.Fecha &&
                         e.Fallecidos.Contains(participanteId)
@@ -176,39 +250,87 @@ public static class EventosEndpoints
                         $"El personaje fallecido con ID {fallecidoId} debe ser participante del evento"
                     );
                 }
+
+                bool participaDespues =
+                    CatalogoStore.Eventos.Any(e =>
+                        e.Id != id &&
+                        e.Fecha > datos.Fecha &&
+                        e.Participantes.Contains(fallecidoId)
+                    );
+
+                if (participaDespues)
+                {
+                    return Results.BadRequest(
+                        $"El personaje con ID {fallecidoId} participa en un evento posterior y no puede morir en esta fecha"
+                    );
+                }
             }
 
-            var eventoActualizado = datos with
-            {
-                Id = id
-            };
+            // Guardamos el evento anterior para saber
+            // qué personajes estaban marcados como fallecidos.
+            var eventoAnterior =
+                CatalogoStore.Eventos[posicionEvento];
+
+            var afectados = eventoAnterior.Fallecidos
+                .Union(datos.Fallecidos)
+                .ToList();
+
+            var eventoActualizado = new Evento(
+                id,
+                datos.Nombre,
+                datos.Fecha,
+                datos.Ubicacion,
+                datos.Descripcion,
+                datos.Participantes,
+                datos.Fallecidos,
+                datos.Resultado,
+                datos.GanadorId
+            );
 
             CatalogoStore.Eventos[posicionEvento] =
                 eventoActualizado;
 
-            for (int i = 0;
-                 i < CatalogoStore.Personajes.Count;
-                 i++)
+            // Recalcular el estado de los personajes afectados.
+            foreach (int personajeId in afectados)
             {
-                var personaje = CatalogoStore.Personajes[i];
+                int posicionPersonaje =
+                    CatalogoStore.Personajes.FindIndex(p =>
+                        p.Id == personajeId
+                    );
+
+                if (posicionPersonaje == -1)
+                {
+                    continue;
+                }
 
                 bool apareceComoFallecido =
                     CatalogoStore.Eventos.Any(e =>
-                        e.Fallecidos.Contains(personaje.Id)
+                        e.Fallecidos.Contains(personajeId)
                     );
 
-                if (apareceComoFallecido)
-                {
-                    CatalogoStore.Personajes[i] =
-                        personaje with
-                        {
-                            Estado = "muerto"
-                        };
-                }
+                var personaje =
+                    CatalogoStore.Personajes[posicionPersonaje];
+
+                CatalogoStore.Personajes[posicionPersonaje] =
+                    personaje with
+                    {
+                        Estado = apareceComoFallecido
+                            ? "muerto"
+                            : "vivo"
+                    };
             }
 
             return Results.Ok(eventoActualizado);
-        });
+        })
+        .WithTags("Eventos")
+        .WithSummary("Modificar evento")
+        .WithDescription(
+            "Actualiza un evento y vuelve a comprobar la consistencia temporal de los personajes."
+        )
+        .Produces<Evento>(StatusCodes.Status200OK)
+        .Produces<string>(StatusCodes.Status400BadRequest)
+        .Produces<string>(StatusCodes.Status404NotFound);
+
 
         // GET - Obtener el MVP de un evento
         app.MapGet("/eventos/{id:int}/mvp", (
@@ -219,12 +341,16 @@ public static class EventosEndpoints
 
             if (evento is null)
             {
-                return Results.NotFound("Evento no encontrado");
+                return Results.NotFound(
+                    "Evento no encontrado"
+                );
             }
 
             var mvp = CatalogoStore.Cartas
                 .Where(c =>
-                    evento.Participantes.Contains(c.PersonajeId)
+                    evento.Participantes.Contains(
+                        c.PersonajeId
+                    )
                 )
                 .OrderByDescending(c => c.Poder)
                 .FirstOrDefault();
@@ -236,9 +362,8 @@ public static class EventosEndpoints
                 );
             }
 
-            var personaje = service.BuscarPersonaje(
-                mvp.PersonajeId
-            );
+            var personaje =
+                service.BuscarPersonaje(mvp.PersonajeId);
 
             return Results.Ok(new
             {
@@ -246,9 +371,19 @@ public static class EventosEndpoints
                 PersonajeId = mvp.PersonajeId,
                 Personaje = personaje?.Nombre,
                 Poder = mvp.Poder,
-                HabilidadEspecial = mvp.HabilidadEspecial
+                HabilidadEspecial =
+                    mvp.HabilidadEspecial
             });
-        });
+        })
+        .WithTags("Eventos")
+        .WithSummary("Obtener MVP del evento")
+        .WithDescription(
+            "Obtiene al participante con mayor poder de carta dentro del evento."
+        )
+        .Produces(StatusCodes.Status200OK)
+        .Produces<string>(StatusCodes.Status400BadRequest)
+        .Produces<string>(StatusCodes.Status404NotFound);
+
 
         // POST - Simular un evento
         app.MapPost("/eventos/{id:int}/simular", (
@@ -259,7 +394,9 @@ public static class EventosEndpoints
 
             if (evento is null)
             {
-                return Results.NotFound("Evento no encontrado");
+                return Results.NotFound(
+                    "Evento no encontrado"
+                );
             }
 
             if (evento.Participantes.Count < 2)
@@ -269,26 +406,28 @@ public static class EventosEndpoints
                 );
             }
 
-            var participantesConPoder = evento.Participantes
-                .Join(
-                    CatalogoStore.Personajes,
-                    participanteId => participanteId,
-                    personaje => personaje.Id,
-                    (participanteId, personaje) => personaje
-                )
-                .Join(
-                    CatalogoStore.Cartas,
-                    personaje => personaje.Id,
-                    carta => carta.PersonajeId,
-                    (personaje, carta) => new
-                    {
-                        personaje.Id,
-                        personaje.Nombre,
-                        personaje.Faccion,
-                        carta.Poder
-                    }
-                )
-                .ToList();
+            var participantesConPoder =
+                evento.Participantes
+                    .Join(
+                        CatalogoStore.Personajes,
+                        participanteId => participanteId,
+                        personaje => personaje.Id,
+                        (participanteId, personaje) =>
+                            personaje
+                    )
+                    .Join(
+                        CatalogoStore.Cartas,
+                        personaje => personaje.Id,
+                        carta => carta.PersonajeId,
+                        (personaje, carta) => new
+                        {
+                            personaje.Id,
+                            personaje.Nombre,
+                            personaje.Faccion,
+                            carta.Poder
+                        }
+                    )
+                    .ToList();
 
             if (participantesConPoder.Count < 2)
             {
@@ -302,7 +441,8 @@ public static class EventosEndpoints
                 .Select(grupo => new
                 {
                     Faccion = grupo.Key,
-                    PoderBase = grupo.Sum(p => p.Poder)
+                    PoderBase =
+                        grupo.Sum(p => p.Poder)
                 })
                 .ToList();
 
@@ -317,23 +457,29 @@ public static class EventosEndpoints
                 .Select(bando =>
                 {
                     double factorAleatorio =
-                        Random.Shared.Next(90, 111) / 100.0;
+                        Random.Shared.Next(90, 111)
+                        / 100.0;
 
                     double poderFinal =
-                        bando.PoderBase * factorAleatorio;
+                        bando.PoderBase *
+                        factorAleatorio;
 
                     return new
                     {
                         bando.Faccion,
                         bando.PoderBase,
-                        FactorAleatorio = factorAleatorio,
-                        PoderFinal = Math.Round(
-                            poderFinal,
-                            2
-                        )
+                        FactorAleatorio =
+                            factorAleatorio,
+                        PoderFinal =
+                            Math.Round(
+                                poderFinal,
+                                2
+                            )
                     };
                 })
-                .OrderByDescending(b => b.PoderFinal)
+                .OrderByDescending(b =>
+                    b.PoderFinal
+                )
                 .ToList();
 
             var ganador = resultados.First();
@@ -349,6 +495,14 @@ public static class EventosEndpoints
                 Criterio =
                     "Suma del poder de las cartas por facción con un factor aleatorio entre 0.90 y 1.10"
             });
-        });
+        })
+        .WithTags("Eventos")
+        .WithSummary("Simular evento")
+        .WithDescription(
+            "Simula el resultado del evento sumando el poder por facción y aplicando un factor aleatorio entre 0.90 y 1.10."
+        )
+        .Produces(StatusCodes.Status200OK)
+        .Produces<string>(StatusCodes.Status400BadRequest)
+        .Produces<string>(StatusCodes.Status404NotFound);
     }
 }

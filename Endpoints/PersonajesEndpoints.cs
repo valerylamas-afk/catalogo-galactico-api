@@ -1,5 +1,6 @@
 using PersonajesApi.Data;
 using PersonajesApi.Models;
+using PersonajesApi.Models.DTOs;
 using PersonajesApi.Services;
 
 namespace PersonajesApi.Endpoints;
@@ -33,7 +34,14 @@ public static class PersonajesEndpoints
             }
 
             return Results.Ok(personajes);
-        });
+        })
+        .WithTags("Personajes")
+        .WithSummary("Listar personajes")
+        .WithDescription(
+            "Obtiene todos los personajes. Permite filtrar por facción y sensibilidad a la Fuerza."
+        )
+        .Produces<List<Personaje>>(StatusCodes.Status200OK);
+
 
         // GET - Buscar personaje por ID
         app.MapGet("/personajes/{id:int}", (
@@ -50,10 +58,18 @@ public static class PersonajesEndpoints
             }
 
             return Results.Ok(personaje);
-        });
+        })
+        .WithTags("Personajes")
+        .WithSummary("Buscar personaje por ID")
+        .WithDescription(
+            "Obtiene un personaje utilizando su identificador."
+        )
+        .Produces<Personaje>(StatusCodes.Status200OK)
+        .Produces<string>(StatusCodes.Status404NotFound);
+
 
         // POST - Crear personaje
-        app.MapPost("/personajes", (Personaje personaje) =>
+        app.MapPost("/personajes", (PersonajeDto personaje) =>
         {
             if (string.IsNullOrWhiteSpace(personaje.Nombre))
             {
@@ -94,10 +110,15 @@ public static class PersonajesEndpoints
                 ? 1
                 : CatalogoStore.Personajes.Max(p => p.Id) + 1;
 
-            var nuevoPersonaje = personaje with
-            {
-                Id = nuevoId
-            };
+            var nuevoPersonaje = new Personaje(
+                nuevoId,
+                personaje.Nombre,
+                personaje.Especie,
+                personaje.Faccion,
+                personaje.Afiliacion,
+                personaje.Estado,
+                personaje.FuerzaSensitivo
+            );
 
             CatalogoStore.Personajes.Add(nuevoPersonaje);
 
@@ -105,12 +126,20 @@ public static class PersonajesEndpoints
                 $"/personajes/{nuevoId}",
                 nuevoPersonaje
             );
-        });
+        })
+        .WithTags("Personajes")
+        .WithSummary("Crear personaje")
+        .WithDescription(
+            "Crea un nuevo personaje en el catálogo."
+        )
+        .Produces<Personaje>(StatusCodes.Status201Created)
+        .Produces<string>(StatusCodes.Status400BadRequest);
+
 
         // PUT - Modificar personaje
         app.MapPut("/personajes/{id:int}", (
             int id,
-            Personaje datos) =>
+            PersonajeDto datos) =>
         {
             int posicion = CatalogoStore.Personajes
                 .FindIndex(p => p.Id == id);
@@ -157,16 +186,30 @@ public static class PersonajesEndpoints
                 );
             }
 
-            var personajeActualizado = datos with
-            {
-                Id = id
-            };
+            var personajeActualizado = new Personaje(
+                id,
+                datos.Nombre,
+                datos.Especie,
+                datos.Faccion,
+                datos.Afiliacion,
+                datos.Estado,
+                datos.FuerzaSensitivo
+            );
 
             CatalogoStore.Personajes[posicion] =
                 personajeActualizado;
 
             return Results.Ok(personajeActualizado);
-        });
+        })
+        .WithTags("Personajes")
+        .WithSummary("Modificar personaje")
+        .WithDescription(
+            "Actualiza los datos de un personaje existente."
+        )
+        .Produces<Personaje>(StatusCodes.Status200OK)
+        .Produces<string>(StatusCodes.Status400BadRequest)
+        .Produces<string>(StatusCodes.Status404NotFound);
+
 
         // DELETE - Eliminar personaje
         app.MapDelete("/personajes/{id:int}", (int id) =>
@@ -184,7 +227,15 @@ public static class PersonajesEndpoints
             CatalogoStore.Personajes.Remove(personaje);
 
             return Results.NoContent();
-        });
+        })
+        .WithTags("Personajes")
+        .WithSummary("Eliminar personaje")
+        .WithDescription(
+            "Elimina un personaje del catálogo."
+        )
+        .Produces(StatusCodes.Status204NoContent)
+        .Produces<string>(StatusCodes.Status404NotFound);
+
 
         // GET - Eventos en los que participó un personaje
         app.MapGet("/personajes/{id:int}/eventos", (
@@ -205,9 +256,17 @@ public static class PersonajesEndpoints
                 .ToList();
 
             return Results.Ok(eventos);
-        });
+        })
+        .WithTags("Personajes")
+        .WithSummary("Obtener eventos de un personaje")
+        .WithDescription(
+            "Obtiene los eventos en los que participó un personaje."
+        )
+        .Produces<List<Evento>>(StatusCodes.Status200OK)
+        .Produces<string>(StatusCodes.Status404NotFound);
 
-        // GET - Ranking de personajes
+
+        // GET - Ranking de personajes por poder
         app.MapGet("/personajes/ranking", (string? por) =>
         {
             if (por != "poder")
@@ -234,6 +293,13 @@ public static class PersonajesEndpoints
                 .ToList();
 
             return Results.Ok(ranking);
-        });
+        })
+        .WithTags("Personajes")
+        .WithSummary("Ranking de personajes por poder")
+        .WithDescription(
+            "Ordena los personajes de mayor a menor según el poder de su carta."
+        )
+        .Produces(StatusCodes.Status200OK)
+        .Produces<string>(StatusCodes.Status400BadRequest);
     }
 }
