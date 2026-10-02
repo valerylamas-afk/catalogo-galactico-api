@@ -427,4 +427,40 @@ app.MapPut("/eventos/{id:int}", (int id, Evento datos) =>
     return Results.Ok(eventoActualizado);
 });
 
+// GET - Obtener el MVP de un evento
+app.MapGet("/eventos/{id:int}/mvp", (int id) =>
+{
+    var evento = CatalogoStore.Eventos
+        .FirstOrDefault(e => e.Id == id);
+
+    if (evento is null)
+    {
+        return Results.NotFound("Evento no encontrado");
+    }
+
+    var mvp = CatalogoStore.Cartas
+        .Where(c => evento.Participantes.Contains(c.PersonajeId))
+        .OrderByDescending(c => c.Poder)
+        .FirstOrDefault();
+
+    if (mvp is null)
+    {
+        return Results.BadRequest(
+            "No hay cartas disponibles para los participantes del evento"
+        );
+    }
+
+    var personaje = CatalogoStore.Personajes
+        .FirstOrDefault(p => p.Id == mvp.PersonajeId);
+
+    return Results.Ok(new
+    {
+        Evento = evento.Nombre,
+        PersonajeId = mvp.PersonajeId,
+        Personaje = personaje?.Nombre,
+        Poder = mvp.Poder,
+        HabilidadEspecial = mvp.HabilidadEspecial
+    });
+});
+
 app.Run();
