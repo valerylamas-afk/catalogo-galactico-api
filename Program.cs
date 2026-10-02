@@ -17,10 +17,27 @@ if (app.Environment.IsDevelopment())
 
 // PERSONAJES
 
-// GET - Obtener todos los personajes
-app.MapGet("/personajes", () =>
+// GET - Obtener personajes con filtros opcionales
+app.MapGet("/personajes", (string? faccion, bool? fuerzaSensitivo) =>
 {
-    return Results.Ok(CatalogoStore.Personajes);
+    var personajes = CatalogoStore.Personajes.AsEnumerable();
+
+    if (!string.IsNullOrWhiteSpace(faccion))
+    {
+        personajes = personajes
+            .Where(p => p.Faccion.Equals(
+                faccion,
+                StringComparison.OrdinalIgnoreCase
+            ));
+    }
+
+    if (fuerzaSensitivo.HasValue)
+    {
+        personajes = personajes
+            .Where(p => p.FuerzaSensitivo == fuerzaSensitivo.Value);
+    }
+
+    return Results.Ok(personajes);
 });
 
 
@@ -38,6 +55,23 @@ app.MapGet("/personajes/{id:int}", (int id) =>
     return Results.Ok(personaje);
 });
 
+// GET - Obtener los eventos de un personaje
+app.MapGet("/personajes/{id:int}/eventos", (int id) =>
+{
+    var personaje = CatalogoStore.Personajes
+        .FirstOrDefault(p => p.Id == id);
+
+    if (personaje is null)
+    {
+        return Results.NotFound("Personaje no encontrado");
+    }
+
+    var eventos = CatalogoStore.Eventos
+        .Where(e => e.Participantes.Contains(id))
+        .ToList();
+
+    return Results.Ok(eventos);
+});
 
 // POST - Crear un personaje
 app.MapPost("/personajes", (Personaje personaje) =>
@@ -143,6 +177,37 @@ app.MapDelete("/personajes/{id:int}", (int id) =>
 
     return Results.NoContent();
 });
+
+
+// GET - Ranking de personajes por poder
+app.MapGet("/personajes/ranking", (string? por) =>
+{
+    if (por != "poder")
+    {
+        return Results.BadRequest(
+            "El parámetro 'por' debe ser 'poder'"
+        );
+    }
+
+    var ranking = CatalogoStore.Personajes
+        .Join(
+            CatalogoStore.Cartas,
+            personaje => personaje.Id,
+            carta => carta.PersonajeId,
+            (personaje, carta) => new
+            {
+                personaje.Id,
+                personaje.Nombre,
+                personaje.Faccion,
+                Poder = carta.Poder
+            }
+        )
+        .OrderByDescending(x => x.Poder)
+        .ToList();
+
+    return Results.Ok(ranking);
+});
+
 
 // CARTAS
 
