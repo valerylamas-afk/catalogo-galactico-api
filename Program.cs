@@ -338,7 +338,9 @@ app.MapPost("/eventos", (Evento evento) =>
 {
     if (string.IsNullOrWhiteSpace(evento.Nombre))
     {
-        return Results.BadRequest("El nombre del evento es obligatorio");
+        return Results.BadRequest(
+            "El nombre del evento es obligatorio"
+        );
     }
 
     if (evento.Participantes is null || evento.Participantes.Count == 0)
@@ -348,6 +350,7 @@ app.MapPost("/eventos", (Evento evento) =>
         );
     }
 
+    // Validar que todos los participantes existan
     foreach (int participanteId in evento.Participantes)
     {
         bool existePersonaje = CatalogoStore.Personajes
@@ -357,6 +360,31 @@ app.MapPost("/eventos", (Evento evento) =>
         {
             return Results.BadRequest(
                 $"El personaje con ID {participanteId} no existe"
+            );
+        }
+
+        // Buscar si el personaje murió en un evento anterior
+        bool murioAnteriormente = CatalogoStore.Eventos
+            .Any(e =>
+                e.Fecha < evento.Fecha &&
+                e.Fallecidos.Contains(participanteId)
+            );
+
+        if (murioAnteriormente)
+        {
+            return Results.BadRequest(
+                $"El personaje con ID {participanteId} murió antes de este evento"
+            );
+        }
+    }
+
+    // Validar los fallecidos
+    foreach (int fallecidoId in evento.Fallecidos)
+    {
+        if (!evento.Participantes.Contains(fallecidoId))
+        {
+            return Results.BadRequest(
+                $"El personaje fallecido con ID {fallecidoId} debe ser participante del evento"
             );
         }
     }
@@ -372,6 +400,20 @@ app.MapPost("/eventos", (Evento evento) =>
 
     CatalogoStore.Eventos.Add(nuevoEvento);
 
+    // Actualizar estado de los personajes fallecidos
+    foreach (int fallecidoId in evento.Fallecidos)
+    {
+        int posicion = CatalogoStore.Personajes
+            .FindIndex(p => p.Id == fallecidoId);
+
+        var personaje = CatalogoStore.Personajes[posicion];
+
+        CatalogoStore.Personajes[posicion] = personaje with
+        {
+            Estado = "muerto"
+        };
+    }
+
     return Results.Created(
         $"/eventos/{nuevoId}",
         nuevoEvento
@@ -382,10 +424,10 @@ app.MapPost("/eventos", (Evento evento) =>
 // PUT - Modificar un evento
 app.MapPut("/eventos/{id:int}", (int id, Evento datos) =>
 {
-    int posicion = CatalogoStore.Eventos
+    int posicionEvento = CatalogoStore.Eventos
         .FindIndex(e => e.Id == id);
 
-    if (posicion == -1)
+    if (posicionEvento == -1)
     {
         return Results.NotFound("Evento no encontrado");
     }
@@ -404,6 +446,7 @@ app.MapPut("/eventos/{id:int}", (int id, Evento datos) =>
         );
     }
 
+    // Validar participantes
     foreach (int participanteId in datos.Participantes)
     {
         bool existePersonaje = CatalogoStore.Personajes
@@ -415,6 +458,31 @@ app.MapPut("/eventos/{id:int}", (int id, Evento datos) =>
                 $"El personaje con ID {participanteId} no existe"
             );
         }
+
+        bool murioAnteriormente = CatalogoStore.Eventos
+            .Any(e =>
+                e.Id != id &&
+                e.Fecha < datos.Fecha &&
+                e.Fallecidos.Contains(participanteId)
+            );
+
+        if (murioAnteriormente)
+        {
+            return Results.BadRequest(
+                $"El personaje con ID {participanteId} murió antes de este evento"
+            );
+        }
+    }
+
+    // Validar fallecidos
+    foreach (int fallecidoId in datos.Fallecidos)
+    {
+        if (!datos.Participantes.Contains(fallecidoId))
+        {
+            return Results.BadRequest(
+                $"El personaje fallecido con ID {fallecidoId} debe ser participante del evento"
+            );
+        }
     }
 
     var eventoActualizado = datos with
@@ -422,7 +490,24 @@ app.MapPut("/eventos/{id:int}", (int id, Evento datos) =>
         Id = id
     };
 
-    CatalogoStore.Eventos[posicion] = eventoActualizado;
+    CatalogoStore.Eventos[posicionEvento] = eventoActualizado;
+
+    // Recalcular estados de todos los personajes
+    for (int i = 0; i < CatalogoStore.Personajes.Count; i++)
+    {
+        var personaje = CatalogoStore.Personajes[i];
+
+        bool apareceComoFallecido = CatalogoStore.Eventos
+            .Any(e => e.Fallecidos.Contains(personaje.Id));
+
+        if (apareceComoFallecido)
+        {
+            CatalogoStore.Personajes[i] = personaje with
+            {
+                Estado = "muerto"
+            };
+        }
+    }
 
     return Results.Ok(eventoActualizado);
 });
@@ -462,5 +547,6 @@ app.MapGet("/eventos/{id:int}/mvp", (int id) =>
         HabilidadEspecial = mvp.HabilidadEspecial
     });
 });
+
 
 app.Run();

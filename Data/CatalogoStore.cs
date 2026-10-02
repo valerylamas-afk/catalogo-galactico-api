@@ -21,27 +21,29 @@ public static class CatalogoStore
     ];
 
     public static List<Evento> Eventos { get; } =
-    [
-        new(
-            1,
-            "Batalla de Yavin",
-            0,
-            "Yavin 4",
-            "Batalla entre la Alianza Rebelde y el Imperio.",
-            [1, 2, 3, 4],
-            "Victoria Rebelde",
-            1
-        ),
+[
+    new(
+        1,
+        "Batalla de Yavin",
+        0,
+        "Yavin 4",
+        "Batalla entre la Alianza Rebelde y el Imperio.",
+        [1, 2, 3, 4],
+        [],
+        "Victoria Rebelde",
+        1
+    ),
 
-        new(
-            2,
-            "Batalla de Hoth",
-            3,
-            "Hoth",
-            "Ataque del Imperio a la base rebelde.",
-            [1, 2, 3, 4],
-            "Victoria del Imperio",
-            2
-        )
-    ];
+    new(
+        2,
+        "Batalla de Hoth",
+        3,
+        "Hoth",
+        "Ataque del Imperio a la base rebelde.",
+        [1, 2, 3, 4],
+        [],
+        "Victoria del Imperio",
+        2
+    )
+];
 }

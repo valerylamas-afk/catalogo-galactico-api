@@ -7,6 +7,7 @@ public record Evento(
     string Ubicacion,
     string Descripcion,
     List<int> Participantes,
+    List<int> Fallecidos,
     string Resultado,
     int? GanadorId
 );
