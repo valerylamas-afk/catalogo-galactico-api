@@ -127,7 +127,26 @@ public static class EventosEndpoints
                     );
                 }
             }
+            
+            if (evento.GanadorId.HasValue)
+{
+            bool ganadorExiste = CatalogoStore.Personajes
+                .Any(p => p.Id == evento.GanadorId.Value);
 
+            if (!ganadorExiste)
+            {
+                return Results.BadRequest(
+                    "El personaje ganador no existe"
+                );
+            }
+
+            if (!evento.Participantes.Contains(evento.GanadorId.Value))
+            {
+                return Results.BadRequest(
+                    "El personaje ganador debe ser participante del evento"
+                );
+            }
+}
             int nuevoId = CatalogoStore.Eventos.Count == 0
                 ? 1
                 : CatalogoStore.Eventos.Max(e => e.Id) + 1;
@@ -266,14 +285,32 @@ public static class EventosEndpoints
                 }
             }
 
-            // Guardamos el evento anterior para saber
-            // qué personajes estaban marcados como fallecidos.
             var eventoAnterior =
                 CatalogoStore.Eventos[posicionEvento];
 
             var afectados = eventoAnterior.Fallecidos
                 .Union(datos.Fallecidos)
                 .ToList();
+            
+            if (datos.GanadorId.HasValue)
+            {
+             bool ganadorExiste = CatalogoStore.Personajes
+                .Any(p => p.Id == datos.GanadorId.Value);
+
+            if (!ganadorExiste)
+            {
+                return Results.BadRequest(
+                    "El personaje ganador no existe"
+                );
+            }
+
+            if (!datos.Participantes.Contains(datos.GanadorId.Value))
+            {
+                return Results.BadRequest(
+                    "El personaje ganador debe ser participante del evento"
+                );
+            }
+        }
 
             var eventoActualizado = new Evento(
                 id,
