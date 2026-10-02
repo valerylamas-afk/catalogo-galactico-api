@@ -549,4 +549,105 @@ app.MapGet("/eventos/{id:int}/mvp", (int id) =>
 });
 
 
+// POST - Simular un evento
+app.MapPost("/eventos/{id:int}/simular", (int id) =>
+{
+    var evento = CatalogoStore.Eventos
+        .FirstOrDefault(e => e.Id == id);
+
+    if (evento is null)
+    {
+        return Results.NotFound("Evento no encontrado");
+    }
+
+    if (evento.Participantes.Count < 2)
+    {
+        return Results.BadRequest(
+            "Se necesitan al menos dos participantes para simular el evento"
+        );
+    }
+
+    var participantesConPoder = evento.Participantes
+        .Join(
+            CatalogoStore.Personajes,
+            participanteId => participanteId,
+            personaje => personaje.Id,
+            (participanteId, personaje) => personaje
+        )
+        .Join(
+            CatalogoStore.Cartas,
+            personaje => personaje.Id,
+            carta => carta.PersonajeId,
+            (personaje, carta) => new
+            {
+                personaje.Id,
+                personaje.Nombre,
+                personaje.Faccion,
+                carta.Poder
+            }
+        )
+        .ToList();
+
+    if (participantesConPoder.Count < 2)
+    {
+        return Results.BadRequest(
+            "No existen suficientes participantes con cartas para realizar la simulación"
+        );
+    }
+
+    var bandos = participantesConPoder
+        .GroupBy(p => p.Faccion)
+        .Select(grupo => new
+        {
+            Faccion = grupo.Key,
+            PoderBase = grupo.Sum(p => p.Poder)
+        })
+        .ToList();
+
+    if (bandos.Count < 2)
+    {
+        return Results.BadRequest(
+            "Se necesitan al menos dos facciones diferentes para simular el evento"
+        );
+    }
+
+    var resultados = bandos
+        .Select(bando =>
+        {
+            double factorAleatorio =
+                Random.Shared.Next(90, 111) / 100.0;
+
+            double poderFinal =
+                bando.PoderBase * factorAleatorio;
+
+            return new
+            {
+                bando.Faccion,
+                bando.PoderBase,
+                FactorAleatorio = factorAleatorio,
+                PoderFinal = Math.Round(poderFinal, 2)
+            };
+        })
+        .OrderByDescending(b => b.PoderFinal)
+        .ToList();
+
+    var ganador = resultados.First();
+
+    return Results.Ok(new
+    {
+        EventoId = evento.Id,
+        Evento = evento.Nombre,
+
+        Resultado = $"Victoria de {ganador.Faccion}",
+
+        Ganador = ganador.Faccion,
+
+        Totales = resultados,
+
+        Criterio =
+            "Suma del poder de las cartas por facción con un factor aleatorio entre 0.90 y 1.10"
+    });
+});
+
+
 app.Run();
