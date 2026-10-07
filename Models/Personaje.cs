@@ -7,5 +7,6 @@ public record Personaje(
     string Faccion,
     string Afiliacion,
     string Estado,
-    bool FuerzaSensitivo
+    bool FuerzaSensitivo,
+    string Image
 );
