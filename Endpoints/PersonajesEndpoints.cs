@@ -117,7 +117,8 @@ public static class PersonajesEndpoints
                 personaje.Faccion,
                 personaje.Afiliacion,
                 personaje.Estado,
-                personaje.FuerzaSensitivo
+                personaje.FuerzaSensitivo,
+                personaje.Image
             );
 
             CatalogoStore.Personajes.Add(nuevoPersonaje);
@@ -186,14 +187,15 @@ public static class PersonajesEndpoints
                 );
             }
 
-            var personajeActualizado = new Personaje(
+           var personajeActualizado = new Personaje(
                 id,
                 datos.Nombre,
                 datos.Especie,
                 datos.Faccion,
                 datos.Afiliacion,
                 datos.Estado,
-                datos.FuerzaSensitivo
+                datos.FuerzaSensitivo,
+                datos.Image
             );
 
             CatalogoStore.Personajes[posicion] =
@@ -288,7 +290,44 @@ public static class PersonajesEndpoints
         )
         .Produces<List<Evento>>(StatusCodes.Status200OK)
         .Produces<string>(StatusCodes.Status404NotFound);
+        
+        // GET - Obtener personaje junto con su carta
+        app.MapGet("/personajes/{id:int}/con-card", (
+            int id,
+            CatalogoService service) =>
+        {
+            var personaje = service.BuscarPersonaje(id);
 
+            if (personaje is null)
+            {
+                return Results.NotFound(
+                    "Personaje no encontrado"
+                );
+            }
+
+            var card = CatalogoStore.Cartas
+                .FirstOrDefault(c => c.PersonajeId == id);
+
+            if (card is null)
+            {
+                return Results.NotFound(
+                    "El personaje no tiene una carta asociada"
+                );
+            }
+
+            return Results.Ok(new
+            {
+                personaje,
+                card
+            });
+        })
+        .WithTags("Personajes")
+        .WithSummary("Obtener personaje con su carta")
+        .WithDescription(
+            "Combina los datos del personaje con su carta asociada."
+        )
+        .Produces(StatusCodes.Status200OK)
+        .Produces<string>(StatusCodes.Status404NotFound);
 
         // GET - Ranking de personajes por poder
         app.MapGet("/personajes/ranking", (string? por) =>

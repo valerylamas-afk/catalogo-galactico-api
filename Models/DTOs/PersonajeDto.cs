@@ -6,5 +6,6 @@ public record PersonajeDto(
     string Faccion,
     string Afiliacion,
     string Estado,
-    bool FuerzaSensitivo
+    bool FuerzaSensitivo,
+    string Image
 );
