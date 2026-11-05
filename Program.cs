@@ -5,6 +5,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddSingleton<CatalogoService>();
 
+builder.Services.AddControllers(); // permite usar controaldores en nuestra API
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -19,5 +20,7 @@ if (app.Environment.IsDevelopment())
 app.MapPersonajesEndpoints();
 app.MapCartasEndpoints();
 app.MapEventosEndpoints();
+
+app.MapControllers(); // permite que ASP.NET Core reconozca sus rutas.
 
 app.Run();
