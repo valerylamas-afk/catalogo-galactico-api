@@ -17,7 +17,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.MapPersonajesEndpoints();
+//app.MapPersonajesEndpoints();
 app.MapCartasEndpoints();
 app.MapEventosEndpoints();
 
