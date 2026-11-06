@@ -18,7 +18,8 @@ if (app.Environment.IsDevelopment())
 }
 
 //app.MapPersonajesEndpoints();
-app.MapCartasEndpoints();
+//app.MapCartasEndpoints();
+
 app.MapEventosEndpoints();
 
 app.MapControllers(); // permite que ASP.NET Core reconozca sus rutas.
