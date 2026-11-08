@@ -18,6 +18,7 @@ public class AppDbContext : DbContext
     public DbSet<Evento> Eventos { get; set; }
     public DbSet<Escuadron> Escuadrones { get; set; }
     public DbSet<EscuadronIntegrante> EscuadronIntegrantes { get; set; }
+    public DbSet<Usuario> Usuarios { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -119,6 +120,20 @@ public class AppDbContext : DbContext
                     .WithMany()
                     .HasForeignKey(e => e.PersonajeId)
                     .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<Usuario>(entity =>
+            {
+                entity.HasKey(u => u.Id);
+
+                entity.Property(u => u.Id)
+                    .ValueGeneratedOnAdd();
+
+                entity.HasIndex(u => u.Correo)
+                    .IsUnique();
+
+                entity.Property(u => u.Correo)
+                    .HasMaxLength(200);
             });
 
         });
