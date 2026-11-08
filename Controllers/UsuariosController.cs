@@ -24,13 +24,16 @@ public class UsuariosController : ControllerBase
 {
     private readonly AppDbContext _db;
     private readonly CifradoService _cifrado;
+    private readonly IWebHostEnvironment _entorno;
 
     public UsuariosController(
         AppDbContext db,
-        CifradoService cifrado)
+        CifradoService cifrado,
+        IWebHostEnvironment entorno)
     {
         _db = db;
         _cifrado = cifrado;
+        _entorno = entorno;
     }
 
     // POST /api/usuarios/registro
@@ -81,7 +84,7 @@ public class UsuariosController : ControllerBase
             usuario.Correo
         });
     }
-
+    
     // PUT /api/usuarios/{id}/nota-privada
     // Demostración local: no publicar sin autenticación
     [HttpPut("{id:int}/nota-privada")]
@@ -89,6 +92,10 @@ public class UsuariosController : ControllerBase
         int id,
         NotaPrivadaDto datos)
     {
+        // Solo permitir esta demostración en desarrollo
+        if (!_entorno.IsDevelopment())
+            return NotFound();
+
         var usuario = await _db.Usuarios.FindAsync(id);
 
         if (usuario is null)
