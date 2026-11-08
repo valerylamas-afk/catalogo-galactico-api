@@ -1,9 +1,9 @@
 
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using PersonajesApi.Data;
 using PersonajesApi.Models;
 using PersonajesApi.Models.DTOs;
-using PersonajesApi.Services;
 
 namespace PersonajesApi.Controllers;
 
@@ -11,49 +11,48 @@ namespace PersonajesApi.Controllers;
 [Route("personajes")]
 public class PersonajesController : ControllerBase
 {
-    private readonly CatalogoService _service;
+    private readonly AppDbContext _db;
 
-    public PersonajesController(CatalogoService service)
+    public PersonajesController(AppDbContext db)
     {
-        _service = service;
+        _db = db;
     }
 
     // GET /personajes
     [HttpGet]
-    public IActionResult Listar(
+    public async Task<IActionResult> Listar(
         [FromQuery] string? faccion,
         [FromQuery] bool? fuerzaSensitivo)
     {
-        var personajes = CatalogoStore.Personajes.AsEnumerable();
+        var consulta = _db.Personajes.AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(faccion))
         {
-            personajes = personajes.Where(p =>
-                p.Faccion.Equals(
-                    faccion,
-                    StringComparison.OrdinalIgnoreCase));
+            consulta = consulta.Where(p =>
+                p.Faccion.ToLower() == faccion.ToLower());
         }
 
         if (fuerzaSensitivo.HasValue)
         {
-            personajes = personajes.Where(p =>
+            consulta = consulta.Where(p =>
                 p.FuerzaSensitivo == fuerzaSensitivo.Value);
         }
 
-        return Ok(personajes.ToList());
+        return Ok(await consulta.ToListAsync());
     }
 
     // GET /personajes/ranking?por=poder
     [HttpGet("ranking")]
-    public IActionResult Ranking([FromQuery] string? por)
+    public async Task<IActionResult> Ranking(
+        [FromQuery] string? por)
     {
         if (por != "poder")
             return BadRequest(
                 "El parámetro 'por' debe ser 'poder'");
 
-        var ranking = CatalogoStore.Personajes
+        var ranking = await _db.Personajes
             .Join(
-                CatalogoStore.Cartas,
+                _db.Cartas,
                 personaje => personaje.Id,
                 carta => carta.PersonajeId,
                 (personaje, carta) => new
@@ -64,16 +63,16 @@ public class PersonajesController : ControllerBase
                     Poder = carta.Poder
                 })
             .OrderByDescending(x => x.Poder)
-            .ToList();
+            .ToListAsync();
 
         return Ok(ranking);
     }
 
     // GET /personajes/{id}
     [HttpGet("{id:int}")]
-    public IActionResult ObtenerPorId(int id)
+    public async Task<IActionResult> ObtenerPorId(int id)
     {
-        var personaje = _service.BuscarPersonaje(id);
+        var personaje = await _db.Personajes.FindAsync(id);
 
         if (personaje is null)
             return NotFound("Personaje no encontrado");
@@ -83,20 +82,15 @@ public class PersonajesController : ControllerBase
 
     // POST /personajes
     [HttpPost]
-    public IActionResult Crear(PersonajeDto datos)
+    public async Task<IActionResult> Crear(PersonajeDto datos)
     {
         var error = Validar(datos);
 
         if (error != null)
             return BadRequest(error);
 
-        int nuevoId = CatalogoStore.Personajes.Count == 0
-            ? 1
-            : CatalogoStore.Personajes.Max(p => p.Id) + 1;
-
         var nuevo = new Personaje
         {
-            Id = nuevoId,
             Nombre = datos.Nombre,
             Especie = datos.Especie,
             Faccion = datos.Faccion,
@@ -105,19 +99,20 @@ public class PersonajesController : ControllerBase
             FuerzaSensitivo = datos.FuerzaSensitivo
         };
 
-        CatalogoStore.Personajes.Add(nuevo);
+        _db.Personajes.Add(nuevo);
+        await _db.SaveChangesAsync();
 
-        return Created($"/personajes/{nuevoId}", nuevo);
+        return Created($"/personajes/{nuevo.Id}", nuevo);
     }
 
     // PUT /personajes/{id}
     [HttpPut("{id:int}")]
-    public IActionResult Actualizar(int id, PersonajeDto datos)
+    public async Task<IActionResult> Actualizar(
+        int id, PersonajeDto datos)
     {
-        int posicion = CatalogoStore.Personajes
-            .FindIndex(p => p.Id == id);
+        var personaje = await _db.Personajes.FindAsync(id);
 
-        if (posicion == -1)
+        if (personaje is null)
             return NotFound("Personaje no encontrado");
 
         var error = Validar(datos);
@@ -125,64 +120,73 @@ public class PersonajesController : ControllerBase
         if (error != null)
             return BadRequest(error);
 
-        var actualizado = new Personaje
-        {
-            Id = id,
-            Nombre = datos.Nombre,
-            Especie = datos.Especie,
-            Faccion = datos.Faccion,
-            Afiliacion = datos.Afiliacion,
-            Estado = datos.Estado,
-            FuerzaSensitivo = datos.FuerzaSensitivo
-        };
+        personaje.Nombre = datos.Nombre;
+        personaje.Especie = datos.Especie;
+        personaje.Faccion = datos.Faccion;
+        personaje.Afiliacion = datos.Afiliacion;
+        personaje.Estado = datos.Estado;
+        personaje.FuerzaSensitivo = datos.FuerzaSensitivo;
 
-        CatalogoStore.Personajes[posicion] = actualizado;
+        await _db.SaveChangesAsync();
 
-        return Ok(actualizado);
+        return Ok(personaje);
     }
 
     // DELETE /personajes/{id}
     [HttpDelete("{id:int}")]
-    public IActionResult Eliminar(int id)
+    public async Task<IActionResult> Eliminar(int id)
     {
-        var personaje = _service.BuscarPersonaje(id);
+        var personaje = await _db.Personajes.FindAsync(id);
 
         if (personaje is null)
             return NotFound("Personaje no encontrado");
 
-        if (_service.PersonajeTieneCarta(id))
+        bool tieneCarta = await _db.Cartas
+            .AnyAsync(c => c.PersonajeId == id);
+
+        if (tieneCarta)
             return BadRequest(
                 "No se puede eliminar el personaje porque tiene una carta asociada");
 
-        bool participaEnEvento = CatalogoStore.Eventos.Any(e =>
-            e.Participantes.Contains(id) ||
-            e.Fallecidos.Contains(id) ||
-            e.GanadorId == id);
+        bool esGanador = await _db.Eventos
+            .AnyAsync(e => e.GanadorId == id);
+
+        var eventos = await _db.Eventos.ToListAsync();
+
+        bool participaEnEvento = esGanador ||
+            eventos.Any(e =>
+                e.Participantes.Contains(id) ||
+                e.Fallecidos.Contains(id));
 
         if (participaEnEvento)
             return BadRequest(
                 "No se puede eliminar el personaje porque está relacionado con un evento");
 
-        CatalogoStore.Personajes.Remove(personaje);
+        _db.Personajes.Remove(personaje);
+        await _db.SaveChangesAsync();
 
         return NoContent();
     }
 
     // GET /personajes/{id}/eventos
     [HttpGet("{id:int}/eventos")]
-    public IActionResult ObtenerEventos(int id)
+    public async Task<IActionResult> ObtenerEventos(int id)
     {
-        if (_service.BuscarPersonaje(id) is null)
+        var personaje = await _db.Personajes.FindAsync(id);
+
+        if (personaje is null)
             return NotFound("Personaje no encontrado");
 
-        var eventos = CatalogoStore.Eventos
+        var eventos = await _db.Eventos.ToListAsync();
+
+        var relacionados = eventos
             .Where(e => e.Participantes.Contains(id))
             .ToList();
 
-        return Ok(eventos);
+        return Ok(relacionados);
     }
 
-    // Validaciones para crear y actualizar personajes
+    // Validaciones para POST y PUT
     private string? Validar(PersonajeDto datos)
     {
         if (string.IsNullOrWhiteSpace(datos.Nombre))

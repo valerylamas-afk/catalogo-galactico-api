@@ -1,9 +1,9 @@
 
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using PersonajesApi.Data;
 using PersonajesApi.Models;
 using PersonajesApi.Models.DTOs;
-using PersonajesApi.Services;
 
 namespace PersonajesApi.Controllers;
 
@@ -11,107 +11,99 @@ namespace PersonajesApi.Controllers;
 [Route("cartas")]
 public class CartasController : ControllerBase
 {
-    private readonly CatalogoService _service;
+    private readonly AppDbContext _db;
 
-    public CartasController(CatalogoService service)
+    public CartasController(AppDbContext db)
     {
-        _service = service;
+        _db = db;
     }
 
     // GET /cartas
     [HttpGet]
-    public IActionResult Listar()
+    public async Task<IActionResult> Listar()
     {
-        return Ok(CatalogoStore.Cartas);
+        var cartas = await _db.Cartas.ToListAsync();
+        return Ok(cartas);
     }
 
     // GET /cartas/{id}
     [HttpGet("{id:int}")]
-    public IActionResult ObtenerPorId(int id)
+    public async Task<IActionResult> ObtenerPorId(int id)
     {
-        var carta = _service.BuscarCarta(id);
+        var carta = await _db.Cartas.FindAsync(id);
 
         if (carta is null)
-        {
             return NotFound("Carta no encontrada");
-        }
 
         return Ok(carta);
     }
 
     // POST /cartas
     [HttpPost]
-    public IActionResult Crear(CardPersonajeDto datos)
+    public async Task<IActionResult> Crear(CardPersonajeDto datos)
     {
-        if (!_service.ExistePersonaje(datos.PersonajeId))
-        {
-            return BadRequest("El personaje indicado no existe");
-        }
+        bool existePersonaje = await _db.Personajes
+            .AnyAsync(p => p.Id == datos.PersonajeId);
 
-        if (_service.PersonajeTieneCarta(datos.PersonajeId))
-        {
+        if (!existePersonaje)
+            return BadRequest("El personaje no existe");
+
+        bool tieneCarta = await _db.Cartas
+            .AnyAsync(c => c.PersonajeId == datos.PersonajeId);
+
+        if (tieneCarta)
             return BadRequest("El personaje ya tiene una carta");
-        }
 
-        int nuevoId = CatalogoStore.Cartas.Count == 0
-            ? 1
-            : CatalogoStore.Cartas.Max(c => c.Id) + 1;
+        var nueva = new CardPersonaje
+        {
+            PersonajeId = datos.PersonajeId,
+            Poder = datos.Poder,
+            HabilidadEspecial = datos.HabilidadEspecial,
+            Arma = datos.Arma,
+            NivelPeligrosidad = datos.NivelPeligrosidad,
+            ImagenUrl = datos.ImagenUrl
+        };
 
-        var nuevaCarta = new CardPersonaje(
-            nuevoId,
-            datos.PersonajeId,
-            datos.Poder,
-            datos.HabilidadEspecial,
-            datos.Arma,
-            datos.NivelPeligrosidad,
-            datos.ImagenUrl
-        );
+        _db.Cartas.Add(nueva);
+        await _db.SaveChangesAsync();
 
-        CatalogoStore.Cartas.Add(nuevaCarta);
-
-        return Created($"/cartas/{nuevoId}", nuevaCarta);
+        return Created($"/cartas/{nueva.Id}", nueva);
     }
 
     // PUT /cartas/{id}
     [HttpPut("{id:int}")]
-    public IActionResult Actualizar(int id, CardPersonajeDto datos)
+    public async Task<IActionResult> Actualizar(
+        int id, CardPersonajeDto datos)
     {
-        int posicion = CatalogoStore.Cartas
-            .FindIndex(c => c.Id == id);
+        var carta = await _db.Cartas.FindAsync(id);
 
-        if (posicion == -1)
-        {
+        if (carta is null)
             return NotFound("Carta no encontrada");
-        }
 
-        if (!_service.ExistePersonaje(datos.PersonajeId))
-        {
-            return BadRequest("El personaje indicado no existe");
-        }
+        bool existePersonaje = await _db.Personajes
+            .AnyAsync(p => p.Id == datos.PersonajeId);
 
-        bool tieneOtraCarta = CatalogoStore.Cartas
-            .Any(c =>
+        if (!existePersonaje)
+            return BadRequest("El personaje no existe");
+
+        bool otraCarta = await _db.Cartas
+            .AnyAsync(c =>
                 c.PersonajeId == datos.PersonajeId &&
-                c.Id != id
-            );
+                c.Id != id);
 
-        if (tieneOtraCarta)
-        {
-            return BadRequest("El personaje ya tiene otra carta");
-        }
+        if (otraCarta)
+            return BadRequest(
+                "El personaje ya tiene otra carta");
 
-        var cartaActualizada = new CardPersonaje(
-            id,
-            datos.PersonajeId,
-            datos.Poder,
-            datos.HabilidadEspecial,
-            datos.Arma,
-            datos.NivelPeligrosidad,
-            datos.ImagenUrl
-        );
+        carta.PersonajeId = datos.PersonajeId;
+        carta.Poder = datos.Poder;
+        carta.HabilidadEspecial = datos.HabilidadEspecial;
+        carta.Arma = datos.Arma;
+        carta.NivelPeligrosidad = datos.NivelPeligrosidad;
+        carta.ImagenUrl = datos.ImagenUrl;
 
-        CatalogoStore.Cartas[posicion] = cartaActualizada;
+        await _db.SaveChangesAsync();
 
-        return Ok(cartaActualizada);
+        return Ok(carta);
     }
 }

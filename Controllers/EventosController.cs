@@ -1,9 +1,9 @@
 
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using PersonajesApi.Data;
 using PersonajesApi.Models;
 using PersonajesApi.Models.DTOs;
-using PersonajesApi.Services;
 
 namespace PersonajesApi.Controllers;
 
@@ -11,25 +11,25 @@ namespace PersonajesApi.Controllers;
 [Route("eventos")]
 public class EventosController : ControllerBase
 {
-    private readonly CatalogoService _service;
+    private readonly AppDbContext _db;
 
-    public EventosController(CatalogoService service)
+    public EventosController(AppDbContext db)
     {
-        _service = service;
+        _db = db;
     }
 
     // GET /eventos
     [HttpGet]
-    public IActionResult Listar()
+    public async Task<IActionResult> Listar()
     {
-        return Ok(CatalogoStore.Eventos);
+        return Ok(await _db.Eventos.ToListAsync());
     }
 
     // GET /eventos/{id}
     [HttpGet("{id:int}")]
-    public IActionResult ObtenerPorId(int id)
+    public async Task<IActionResult> ObtenerPorId(int id)
     {
-        var evento = _service.BuscarEvento(id);
+        var evento = await _db.Eventos.FindAsync(id);
 
         if (evento is null)
             return NotFound("Evento no encontrado");
@@ -39,108 +39,104 @@ public class EventosController : ControllerBase
 
     // POST /eventos
     [HttpPost]
-    public IActionResult Crear(EventoDto datos)
+    public async Task<IActionResult> Crear(EventoDto datos)
     {
-        var error = ValidarEvento(datos);
+        var error = await ValidarEvento(datos);
 
         if (error != null)
             return BadRequest(error);
 
-        int nuevoId = CatalogoStore.Eventos.Count == 0
-            ? 1
-            : CatalogoStore.Eventos.Max(e => e.Id) + 1;
+        var nuevo = new Evento
+        {
+            Nombre = datos.Nombre,
+            Fecha = datos.Fecha,
+            Ubicacion = datos.Ubicacion,
+            Descripcion = datos.Descripcion,
+            Participantes = datos.Participantes.ToList(),
+            Fallecidos = datos.Fallecidos.ToList(),
+            Resultado = datos.Resultado,
+            GanadorId = datos.GanadorId
+        };
 
-        var nuevoEvento = new Evento(
-            nuevoId,
-            datos.Nombre,
-            datos.Fecha,
-            datos.Ubicacion,
-            datos.Descripcion,
-            datos.Participantes,
-            datos.Fallecidos,
-            datos.Resultado,
-            datos.GanadorId
-        );
-
-        CatalogoStore.Eventos.Add(nuevoEvento);
+        _db.Eventos.Add(nuevo);
 
         foreach (int fallecidoId in datos.Fallecidos)
         {
-            int posicion = CatalogoStore.Personajes
-                .FindIndex(p => p.Id == fallecidoId);
+            var personaje = await _db.Personajes.FindAsync(fallecidoId);
 
-            var personaje = CatalogoStore.Personajes[posicion];
-
-            personaje.Estado = "muerto";
+            if (personaje != null)
+                personaje.Estado = "muerto";
         }
 
-        return Created($"/eventos/{nuevoId}", nuevoEvento);
+        await _db.SaveChangesAsync();
+
+        return Created($"/eventos/{nuevo.Id}", nuevo);
     }
 
     // PUT /eventos/{id}
     [HttpPut("{id:int}")]
-    public IActionResult Actualizar(int id, EventoDto datos)
+    public async Task<IActionResult> Actualizar(
+        int id, EventoDto datos)
     {
-        int posicion = CatalogoStore.Eventos
-            .FindIndex(e => e.Id == id);
-
-        if (posicion == -1)
-            return NotFound("Evento no encontrado");
-
-        var error = ValidarEvento(datos, id);
-
-        if (error != null)
-            return BadRequest(error);
-
-        var eventoAnterior = CatalogoStore.Eventos[posicion];
-
-        var afectados = eventoAnterior.Fallecidos
-            .Union(datos.Fallecidos)
-            .ToList();
-
-        var actualizado = new Evento(
-            id,
-            datos.Nombre,
-            datos.Fecha,
-            datos.Ubicacion,
-            datos.Descripcion,
-            datos.Participantes,
-            datos.Fallecidos,
-            datos.Resultado,
-            datos.GanadorId
-        );
-
-        CatalogoStore.Eventos[posicion] = actualizado;
-
-        foreach (int personajeId in afectados)
-        {
-            int posicionPersonaje = CatalogoStore.Personajes
-                .FindIndex(p => p.Id == personajeId);
-
-            if (posicionPersonaje == -1)
-                continue;
-
-            bool apareceComoFallecido = CatalogoStore.Eventos
-                .Any(e => e.Fallecidos.Contains(personajeId));
-
-            var personaje = CatalogoStore.Personajes[posicionPersonaje];
-
-            personaje.Estado = apareceComoFallecido ? "muerto" : "vivo";
-        }
-
-        return Ok(actualizado);
-    }
-
-    // GET /eventos/{id}/mvp
-    [HttpGet("{id:int}/mvp")]
-    public IActionResult ObtenerMvp(int id)
-    {
-        var evento = _service.BuscarEvento(id);
+        var evento = await _db.Eventos.FindAsync(id);
 
         if (evento is null)
             return NotFound("Evento no encontrado");
 
-        var mvp = CatalogoStore.Cartas
+        var error = await ValidarEvento(datos, id);
+
+        if (error != null)
+            return BadRequest(error);
+
+        var afectados = evento.Fallecidos
+            .Union(datos.Fallecidos)
+            .ToList();
+
+        evento.Nombre = datos.Nombre;
+        evento.Fecha = datos.Fecha;
+        evento.Ubicacion = datos.Ubicacion;
+        evento.Descripcion = datos.Descripcion;
+        evento.Participantes = datos.Participantes.ToList();
+        evento.Fallecidos = datos.Fallecidos.ToList();
+        evento.Resultado = datos.Resultado;
+        evento.GanadorId = datos.GanadorId;
+
+        // Consultamos los eventos desde MySQL.
+        // El evento actual ya tiene sus nuevos valores en memoria.
+        var eventos = await _db.Eventos.ToListAsync();
+
+        foreach (int personajeId in afectados)
+        {
+            var personaje = await _db.Personajes.FindAsync(personajeId);
+
+            if (personaje is null)
+                continue;
+
+            bool apareceComoFallecido = eventos.Any(e =>
+                e.Fallecidos.Contains(personajeId));
+
+            personaje.Estado = apareceComoFallecido
+                ? "muerto"
+                : "vivo";
+        }
+
+        await _db.SaveChangesAsync();
+
+        return Ok(evento);
+    }
+
+    // GET /eventos/{id}/mvp
+    [HttpGet("{id:int}/mvp")]
+    public async Task<IActionResult> ObtenerMvp(int id)
+    {
+        var evento = await _db.Eventos.FindAsync(id);
+
+        if (evento is null)
+            return NotFound("Evento no encontrado");
+
+        var cartas = await _db.Cartas.ToListAsync();
+
+        var mvp = cartas
             .Where(c => evento.Participantes.Contains(c.PersonajeId))
             .OrderByDescending(c => c.Poder)
             .FirstOrDefault();
@@ -149,7 +145,7 @@ public class EventosController : ControllerBase
             return BadRequest(
                 "No hay cartas disponibles para los participantes del evento");
 
-        var personaje = _service.BuscarPersonaje(mvp.PersonajeId);
+        var personaje = await _db.Personajes.FindAsync(mvp.PersonajeId);
 
         return Ok(new
         {
@@ -163,9 +159,9 @@ public class EventosController : ControllerBase
 
     // POST /eventos/{id}/simular
     [HttpPost("{id:int}/simular")]
-    public IActionResult Simular(int id)
+    public async Task<IActionResult> Simular(int id)
     {
-        var evento = _service.BuscarEvento(id);
+        var evento = await _db.Eventos.FindAsync(id);
 
         if (evento is null)
             return NotFound("Evento no encontrado");
@@ -174,15 +170,18 @@ public class EventosController : ControllerBase
             return BadRequest(
                 "Se necesitan al menos dos participantes para simular el evento");
 
+        var personajes = await _db.Personajes.ToListAsync();
+        var cartas = await _db.Cartas.ToListAsync();
+
         var participantesConPoder = evento.Participantes
             .Join(
-                CatalogoStore.Personajes,
+                personajes,
                 participanteId => participanteId,
                 personaje => personaje.Id,
                 (participanteId, personaje) => personaje
             )
             .Join(
-                CatalogoStore.Cartas,
+                cartas,
                 personaje => personaje.Id,
                 carta => carta.PersonajeId,
                 (personaje, carta) => new
@@ -246,8 +245,10 @@ public class EventosController : ControllerBase
         });
     }
 
-    // Validaciones compartidas por POST y PUT
-    private string? ValidarEvento(EventoDto datos, int? idActual = null)
+    // Validaciones para POST y PUT
+    private async Task<string?> ValidarEvento(
+        EventoDto datos,
+        int? idActual = null)
     {
         if (string.IsNullOrWhiteSpace(datos.Nombre))
             return "El nombre del evento es obligatorio";
@@ -259,12 +260,15 @@ public class EventosController : ControllerBase
         if (datos.Fallecidos is null)
             return "La lista de fallecidos es obligatoria";
 
+        var personajes = await _db.Personajes.ToListAsync();
+        var eventos = await _db.Eventos.ToListAsync();
+
         foreach (int participanteId in datos.Participantes)
         {
-            if (!_service.ExistePersonaje(participanteId))
+            if (!personajes.Any(p => p.Id == participanteId))
                 return $"El personaje con ID {participanteId} no existe";
 
-            bool murioAntes = CatalogoStore.Eventos.Any(e =>
+            bool murioAntes = eventos.Any(e =>
                 (!idActual.HasValue || e.Id != idActual.Value) &&
                 e.Fecha < datos.Fecha &&
                 e.Fallecidos.Contains(participanteId));
@@ -278,7 +282,7 @@ public class EventosController : ControllerBase
             if (!datos.Participantes.Contains(fallecidoId))
                 return $"El personaje fallecido con ID {fallecidoId} debe ser participante del evento";
 
-            bool participaDespues = CatalogoStore.Eventos.Any(e =>
+            bool participaDespues = eventos.Any(e =>
                 (!idActual.HasValue || e.Id != idActual.Value) &&
                 e.Fecha > datos.Fecha &&
                 e.Participantes.Contains(fallecidoId));
@@ -289,7 +293,7 @@ public class EventosController : ControllerBase
 
         if (datos.GanadorId.HasValue)
         {
-            if (!_service.ExistePersonaje(datos.GanadorId.Value))
+            if (!personajes.Any(p => p.Id == datos.GanadorId.Value))
                 return "El personaje ganador no existe";
 
             if (!datos.Participantes.Contains(datos.GanadorId.Value))
