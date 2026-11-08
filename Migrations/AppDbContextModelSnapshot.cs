@@ -200,6 +200,9 @@ namespace PersonajesApi.Migrations
                         .IsRequired()
                         .HasColumnType("longtext");
 
+                    b.Property<string>("NotaPrivadaCifrada")
+                        .HasColumnType("longtext");
+
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasColumnType("longtext");

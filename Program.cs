@@ -2,6 +2,7 @@ using PersonajesApi.Services;
 using PersonajesApi.Data;
 using Microsoft.EntityFrameworkCore;
 
+
 var builder = WebApplication.CreateBuilder(args);
 
 
@@ -16,6 +17,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 );
 
 builder.Services.AddSingleton<CatalogoService>();
+builder.Services.AddSingleton<CifradoService>();
 
 builder.Services.AddControllers(); // permite usar controaldores en nuestra API
 builder.Services.AddEndpointsApiExplorer();
