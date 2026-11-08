@@ -1,16 +1,52 @@
 using PersonajesApi.Models;
 
 namespace PersonajesApi.Data;
-
 public static class CatalogoStore
-{
-    public static List<Personaje> Personajes { get; } =
-    [
-        new(1, "Luke Skywalker", "Humano", "Rebelde", "Alianza Rebelde", "vivo", true),
-        new(2, "Darth Vader", "Humano", "Imperio", "Imperio Galáctico", "vivo", true),
-        new(3, "Han Solo", "Humano", "Rebelde", "Alianza Rebelde", "vivo", false),
-        new(4, "Chewbacca", "Wookiee", "Rebelde", "Alianza Rebelde", "vivo", false)
-    ];
+{  
+public static List<Personaje> Personajes { get; } =
+[
+    new Personaje
+    {
+        Id = 1,
+        Nombre = "Luke Skywalker",
+        Especie = "Humano",
+        Faccion = "Rebelde",
+        Afiliacion = "Alianza Rebelde",
+        Estado = "vivo",
+        FuerzaSensitivo = true
+    },
+    new Personaje
+    {
+        Id = 2,
+        Nombre = "Darth Vader",
+        Especie = "Humano",
+        Faccion = "Imperio",
+        Afiliacion = "Imperio Galáctico",
+        Estado = "vivo",
+        FuerzaSensitivo = true
+    },
+    new Personaje
+    {
+        Id = 3,
+        Nombre = "Han Solo",
+        Especie = "Humano",
+        Faccion = "Rebelde",
+        Afiliacion = "Alianza Rebelde",
+        Estado = "vivo",
+        FuerzaSensitivo = false
+    },
+    new Personaje
+    {
+        Id = 4,
+        Nombre = "Chewbacca",
+        Especie = "Wookiee",
+        Faccion = "Rebelde",
+        Afiliacion = "Alianza Rebelde",
+        Estado = "vivo",
+        FuerzaSensitivo = false
+    }
+];
+
 
     public static List<CardPersonaje> Cartas { get; } =
     [

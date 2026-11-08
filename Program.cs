@@ -1,7 +1,19 @@
 using PersonajesApi.Services;
-using PersonajesApi.Endpoints;
+using PersonajesApi.Data;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
+
+
+var connectionString = builder.Configuration
+    .GetConnectionString("DefaultConnection");
+
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseMySql(
+        connectionString,
+        ServerVersion.AutoDetect(connectionString!)
+    )
+);
 
 builder.Services.AddSingleton<CatalogoService>();
 

@@ -71,8 +71,7 @@ public class EventosController : ControllerBase
 
             var personaje = CatalogoStore.Personajes[posicion];
 
-            CatalogoStore.Personajes[posicion] =
-                personaje with { Estado = "muerto" };
+            personaje.Estado = "muerto";
         }
 
         return Created($"/eventos/{nuevoId}", nuevoEvento);
@@ -126,11 +125,7 @@ public class EventosController : ControllerBase
 
             var personaje = CatalogoStore.Personajes[posicionPersonaje];
 
-            CatalogoStore.Personajes[posicionPersonaje] =
-                personaje with
-                {
-                    Estado = apareceComoFallecido ? "muerto" : "vivo"
-                };
+            personaje.Estado = apareceComoFallecido ? "muerto" : "vivo";
         }
 
         return Ok(actualizado);

@@ -94,15 +94,16 @@ public class PersonajesController : ControllerBase
             ? 1
             : CatalogoStore.Personajes.Max(p => p.Id) + 1;
 
-        var nuevo = new Personaje(
-            nuevoId,
-            datos.Nombre,
-            datos.Especie,
-            datos.Faccion,
-            datos.Afiliacion,
-            datos.Estado,
-            datos.FuerzaSensitivo
-        );
+        var nuevo = new Personaje
+        {
+            Id = nuevoId,
+            Nombre = datos.Nombre,
+            Especie = datos.Especie,
+            Faccion = datos.Faccion,
+            Afiliacion = datos.Afiliacion,
+            Estado = datos.Estado,
+            FuerzaSensitivo = datos.FuerzaSensitivo
+        };
 
         CatalogoStore.Personajes.Add(nuevo);
 
@@ -124,15 +125,16 @@ public class PersonajesController : ControllerBase
         if (error != null)
             return BadRequest(error);
 
-        var actualizado = new Personaje(
-            id,
-            datos.Nombre,
-            datos.Especie,
-            datos.Faccion,
-            datos.Afiliacion,
-            datos.Estado,
-            datos.FuerzaSensitivo
-        );
+        var actualizado = new Personaje
+        {
+            Id = id,
+            Nombre = datos.Nombre,
+            Especie = datos.Especie,
+            Faccion = datos.Faccion,
+            Afiliacion = datos.Afiliacion,
+            Estado = datos.Estado,
+            FuerzaSensitivo = datos.FuerzaSensitivo
+        };
 
         CatalogoStore.Personajes[posicion] = actualizado;
 
@@ -180,6 +182,7 @@ public class PersonajesController : ControllerBase
         return Ok(eventos);
     }
 
+    // Validaciones para crear y actualizar personajes
     private string? Validar(PersonajeDto datos)
     {
         if (string.IsNullOrWhiteSpace(datos.Nombre))
