@@ -16,6 +16,8 @@ public class AppDbContext : DbContext
     public DbSet<Personaje> Personajes { get; set; }
     public DbSet<CardPersonaje> Cartas { get; set; }
     public DbSet<Evento> Eventos { get; set; }
+    public DbSet<Escuadron> Escuadrones { get; set; }
+    public DbSet<EscuadronIntegrante> EscuadronIntegrantes { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -86,6 +88,39 @@ public class AppDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(e => e.GanadorId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Escuadron>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+
+                entity.Property(e => e.Id)
+                    .ValueGeneratedOnAdd();
+
+                entity.HasOne(e => e.Lider)
+                    .WithMany()
+                    .HasForeignKey(e => e.LiderId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<EscuadronIntegrante>(entity =>
+            {
+                entity.HasKey(e => new
+                {
+                    e.EscuadronId,
+                    e.PersonajeId
+                });
+
+                entity.HasOne(e => e.Escuadron)
+                    .WithMany(e => e.Integrantes)
+                    .HasForeignKey(e => e.EscuadronId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(e => e.Personaje)
+                    .WithMany()
+                    .HasForeignKey(e => e.PersonajeId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
         });
     }
 }

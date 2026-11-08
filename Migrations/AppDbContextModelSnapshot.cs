@@ -58,6 +58,50 @@ namespace PersonajesApi.Migrations
                     b.ToTable("Cartas");
                 });
 
+            modelBuilder.Entity("PersonajesApi.Models.Escuadron", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Faccion")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<int>("LiderId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Nivel")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Nombre")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LiderId");
+
+                    b.ToTable("Escuadrones");
+                });
+
+            modelBuilder.Entity("PersonajesApi.Models.EscuadronIntegrante", b =>
+                {
+                    b.Property<int>("EscuadronId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("PersonajeId")
+                        .HasColumnType("int");
+
+                    b.HasKey("EscuadronId", "PersonajeId");
+
+                    b.HasIndex("PersonajeId");
+
+                    b.ToTable("EscuadronIntegrantes");
+                });
+
             modelBuilder.Entity("PersonajesApi.Models.Evento", b =>
                 {
                     b.Property<int>("Id")
@@ -148,12 +192,47 @@ namespace PersonajesApi.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("PersonajesApi.Models.Escuadron", b =>
+                {
+                    b.HasOne("PersonajesApi.Models.Personaje", "Lider")
+                        .WithMany()
+                        .HasForeignKey("LiderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Lider");
+                });
+
+            modelBuilder.Entity("PersonajesApi.Models.EscuadronIntegrante", b =>
+                {
+                    b.HasOne("PersonajesApi.Models.Escuadron", "Escuadron")
+                        .WithMany("Integrantes")
+                        .HasForeignKey("EscuadronId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("PersonajesApi.Models.Personaje", "Personaje")
+                        .WithMany()
+                        .HasForeignKey("PersonajeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Escuadron");
+
+                    b.Navigation("Personaje");
+                });
+
             modelBuilder.Entity("PersonajesApi.Models.Evento", b =>
                 {
                     b.HasOne("PersonajesApi.Models.Personaje", null)
                         .WithMany()
                         .HasForeignKey("GanadorId")
                         .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("PersonajesApi.Models.Escuadron", b =>
+                {
+                    b.Navigation("Integrantes");
                 });
 #pragma warning restore 612, 618
         }
