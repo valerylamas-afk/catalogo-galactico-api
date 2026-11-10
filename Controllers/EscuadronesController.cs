@@ -1,4 +1,9 @@
 
+// Validamos que el lider exista y pertenezca al escuadron.
+// La tabla intermedia permite una relacion muchos a muchos.
+// La clave compuesta evita integrantes duplicados.
+// El poder total es la suma de las cartas de sus integrantes.
+// El ranking ordena los escuadrones por poder descendente.
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PersonajesApi.Data;
