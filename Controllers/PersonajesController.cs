@@ -201,6 +201,21 @@ public class PersonajesController : ControllerBase
         if (participaEnEvento)
             return BadRequest(
                 "No se puede eliminar el personaje porque está relacionado con un evento");
+        // Comprobamos si el personaje lidera un escuadron.
+        bool esLider = await _db.Escuadrones
+            .AnyAsync(e => e.LiderId == id);
+
+        if (esLider)
+            return BadRequest(
+                "No se puede eliminar el personaje porque lidera un escuadrón");
+
+        // Comprobamos si pertenece a algun escuadron.
+        bool esIntegrante = await _db.EscuadronIntegrantes
+            .AnyAsync(i => i.PersonajeId == id);
+
+        if (esIntegrante)
+            return BadRequest(
+                "No se puede eliminar el personaje porque pertenece a un escuadrón");
 
         // Solo eliminamos si supera las validaciones anteriores.
         _db.Personajes.Remove(personaje);
