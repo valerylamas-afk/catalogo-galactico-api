@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using PersonajesApi.Data;
 using PersonajesApi.Models;
 using PersonajesApi.Models.DTOs;
+using Microsoft.AspNetCore.Authorization;
 
 namespace PersonajesApi.Controllers;
 
@@ -11,6 +12,7 @@ namespace PersonajesApi.Controllers;
 // Todas las rutas comienzan con /personajes.
 [ApiController]
 [Route("personajes")]
+[Authorize]
 public class PersonajesController : ControllerBase
 {
     private readonly AppDbContext _db;
